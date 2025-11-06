@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Backend Test</title>
+    <style>
+        body { font-family: sans-serif; background: #222; color: #eee; display: flex; flex-wrap: wrap; justify-content: center; gap: 2rem; padding: 2rem; }
+        .container { background: #333; padding: 2rem; border-radius: 8px; width: 400px; }
+        h1, h2, h3 { text-align: center; margin-top: 0; }
+        input, select, button { display: block; width: 95%; margin-bottom: 1rem; padding: 0.5rem; }
+        button { cursor: pointer; }
+        pre { background: #111; padding: 1rem; border-radius: 4px; white-space: pre-wrap; word-break: break-all; min-height: 50px; }
+        .token-info { font-size: 0.8em; color: #999; word-break: break-all; }
+        .question-block, .correction-block { border: 1px solid #555; padding: 1rem; margin-bottom: 1rem; border-radius: 4px; }
+        .question-block p { margin-top: 0; }
+        .options label { display: block; margin-bottom: 0.5rem; }
+        .correction-block .your-answer { color: #ff8a8a; }
+        .correction-block .correct-answer { color: #b9f6ca; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>1. Auth & Admin</h1>
+        <form id="loginForm">
+            <input type="email" id="loginEmail" placeholder="Email" required value="test@example.com">
+            <input type="password" id="loginPassword" placeholder="Password" required value="password123">
+            <button type="submit">Login (to get token)</button>
+        </form>
+        <p class="token-info"><b>Stored Token:</b> <span id="tokenDisplay">None</span></p>
+        <hr>
+        <form id="addQuestionForm">
+            <h3>Add New Question (Protected)</h3>
+            <select id="qLevel" required><option value="O/L">O/L</option><option value="A/L">A/L</option></select>
+            <input type="text" id="qSubject" placeholder="Subject (e.g., Physics)" required>
+            <input type="number" id="qYear" placeholder="Year (e.g., 2022)" required>
+            <input type="text" id="qText" placeholder="Question Text" required>
+            <input type="text" id="qOptions" placeholder="Options (comma-separated)" required>
+            <input type="text" id="qAns" placeholder="Correct Answer" required>
+            <button type="submit">Add Question</button>
+        </form>
+        <pre id="addQResponse">...</pre>
+    </div>
+
+    <div class="container">
+        <h1>2. Take a Test</h1>
+        <form id="getQuestionsForm">
+            <select id="getQLevel" required><option value="O/L">O/L</option><option value="A/L">A/L</option></select>
+            <input type="text" id="getQSubject" placeholder="Subject (e.g., Physics)" required>
+            <input type="number" id="getQYear" placeholder="Year (e.g., 2022)" required>
+            <button type="submit">Fetch Paper</button>
+        </form>
+        <div id="quizContainer"></div>
+        <h3>Submission Result:</h3>
+        <pre id="submitResponse">...</pre>
+        <div id="correctionsContainer"></div>
+    </div>
+
+    <script>
+        let storedToken = null;
+
+        // --- Login Form Logic ---
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const resOut = document.getElementById('tokenDisplay');
+            const data = {
+                email: document.getElementById('loginEmail').value,
+                password: document.getElementById('loginPassword').value,
+            };
+            try {
+                const res = await fetch('http://localhost:5000/api/auth/login', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+                });
+                const result = await res.json();
+                if (result.token) {
+                    storedToken = result.token;
+                    resOut.textContent = "Token stored successfully!";
+                } else {
+                    resOut.textContent = `Login failed: ${result.message}`;
+                }
+            } catch (err) {
+                 resOut.textContent = `Error: ${err.message}`;
+            }
+        });
+        
+        // --- Add Question Logic ---
+        document.getElementById('addQuestionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const resOut = document.getElementById('addQResponse');
+            if (!storedToken) { resOut.textContent = "Error: Please log in first."; return; }
+            const data = {
+                level: document.getElementById('qLevel').value,
+                subject: document.getElementById('qSubject').value,
+                year: parseInt(document.getElementById('qYear').value),
+                questionText: document.getElementById('qText').value,
+                options: document.getElementById('qOptions').value.split(',').map(item => item.trim()),
+                correctAnswer: document.getElementById('qAns').value,
+            };
+            try {
+                const res = await fetch('http://localhost:5000/api/questions', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${storedToken}` }, body: JSON.stringify(data)
+                });
+                resOut.textContent = JSON.stringify(await res.json(), null, 2);
+            } catch (err) { resOut.textContent = `Error: ${err.message}`; }
+        });
+
+        // --- Fetch Questions and Build Quiz Form ---
+        document.getElementById('getQuestionsForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const quizContainer = document.getElementById('quizContainer');
+            quizContainer.innerHTML = 'Loading...';
+            const level = document.getElementById('getQLevel').value;
+            const subject = document.getElementById('getQSubject').value;
+            const year = document.getElementById('getQYear').value;
+            
+            const url = `http://localhost:5000/api/questions?level=${encodeURIComponent(level)}&subject=${encodeURIComponent(subject)}&year=${year}`;
+            
+            try {
+                const res = await fetch(url);
+                const questions = await res.json();
+                
+                if (res.status !== 200 || questions.length === 0) {
+                     quizContainer.innerHTML = `<p>${questions.message || 'No questions found for this selection.'}</p>`;
+                     return;
+                }
+
+                const quizForm = document.createElement('form');
+                quizForm.id = 'quizForm';
+                questions.forEach((q, index) => {
+                    const questionBlock = document.createElement('div');
+                    questionBlock.className = 'question-block';
+                    let optionsHTML = '';
+                    q.options.forEach(opt => {
+                        optionsHTML += `<label><input type="radio" name="q${q._id}" value="${opt}" required> ${opt}</label>`;
+                    });
+                    questionBlock.innerHTML = `<p><b>Q${index + 1}:</b> ${q.questionText}</p><div class="options">${optionsHTML}</div>`;
+                    quizForm.appendChild(questionBlock);
+                });
+                const submitBtn = document.createElement('button');
+                submitBtn.type = 'submit';
+                submitBtn.textContent = 'Submit Answers';
+                quizForm.appendChild(submitBtn);
+                quizContainer.appendChild(quizForm);
+
+                quizForm.addEventListener('submit', handleQuizSubmit);
+            } catch (err) {
+                quizContainer.innerHTML = `<p>Error fetching questions: ${err.message}</p>`;
+            }
+        });
+        
+        // --- Handle Quiz Submission ---
+        async function handleQuizSubmit(e) {
+            e.preventDefault();
+            const resOut = document.getElementById('submitResponse');
+            const correctionsContainer = document.getElementById('correctionsContainer');
+            correctionsContainer.innerHTML = '';
+            resOut.textContent = 'Submitting...';
+            if (!storedToken) { resOut.textContent = "Error: Please log in first to submit an attempt."; return; }
+            
+            const formData = new FormData(e.target);
+            const userAnswers = [];
+            for (let [key, value] of formData.entries()) {
+                userAnswers.push({
+                    questionId: key.substring(1),
+                    userAnswer: value
+                });
+            }
+            
+            const submissionData = {
+                level: document.getElementById('getQLevel').value,
+                subject: document.getElementById('getQSubject').value,
+                year: parseInt(document.getElementById('getQYear').value),
+                answers: userAnswers
+            };
+            
+            try {
+                const res = await fetch('http://localhost:5000/api/attempts/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${storedToken}` },
+                    body: JSON.stringify(submissionData)
+                });
+                const result = await res.json();
+                resOut.textContent = JSON.stringify(result, null, 2);
+
+                if (result.corrections && result.corrections.length > 0) {
+                    let correctionsHTML = '<h3>Corrections:</h3>';
+                    result.corrections.forEach(corr => {
+                        correctionsHTML += `
+                            <div class="correction-block">
+                                <p><b>Question:</b> ${corr.questionText}</p>
+                                <p class="your-answer"><b>Your Answer:</b> ${corr.yourAnswer}</p>
+                                <p class="correct-answer"><b>Correct Answer:</b> ${corr.correctAnswer}</p>
+                            </div>
+                        `;
+                    });
+                    correctionsContainer.innerHTML = correctionsHTML;
+                }
+            } catch (err) {
+                 resOut.textContent = `Error: ${err.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
