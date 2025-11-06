@@ -23,26 +23,28 @@ connectDB();
 
 const app = express();
 
-// --- CORS Configuration (with all your Vercel URLs) ---
-const allowedOrigins = [
-  'http://localhost:3000', // For local development
-  'https://my-mcq-app-frontend.vercel.app',
-  'https://open-mcq-eosin.vercel.app',
-  'https://open-qhxvmjo2m-sasindu-liyanages-projects.vercel.app'
-  // Add any new Vercel URLs here if they change
-];
-
-app.use(cors({
-  origin: function (origin, callback) {
-    // allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
+// --- NEW DYNAMIC CORS CONFIGURATION ---
+// This REPLACES your old 'allowedOrigins' array and 'app.use(cors(...))'
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like Postman, mobile apps, or curl)
+    if (!origin) {
+      return callback(null, true);
     }
-    return callback(null, true);
-  }
-}));
+    
+    // Allow localhost for development and all .vercel.app domains for production/previews
+    if (origin === 'http://localhost:3000' || origin.endsWith('.vercel.app')) {
+      return callback(null, true); // Allowed
+    } else {
+      // Blocked by CORS
+      return callback(new Error('The CORS policy for this site does not allow access from the specified Origin.'));
+    }
+  },
+  credentials: true, // If you need to send cookies with requests
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
 // --------------------------------------------------
 
 app.use(express.json()); // Allow the app to accept JSON data
@@ -66,5 +68,5 @@ app.use(notFound);
 app.use(errorHandler);
 
 // --- Start Server ---
-const PORT = process.env.PORT || 5000;
+const PORT = process.DOCKER_PORT || process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
