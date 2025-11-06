@@ -81,13 +81,20 @@ export default function AddNewPaperPage() {
 
         setIsSubmitting(true);
 
+        const formattedOptions = options.map(opt => ({
+            text: opt.trim(), // Each option is text
+            imageUrl: null    // Image URL is null
+        }));
+
         const payload = {
             grade: level,
             subject: subject,
-            year: yearNum, // Send the parsed number
+            year: yearNum,
             question: questionText.trim(),
-            options: options.map(opt => opt.trim()),
+            options: formattedOptions, // Send the new array of objects
             correctAnswer: correctAnswer.trim(),
+            contextImageUrl: null, // Also send null for the new context fields
+            contextText: null
         };
 
         console.log("Submitting new paper (first question):", payload);

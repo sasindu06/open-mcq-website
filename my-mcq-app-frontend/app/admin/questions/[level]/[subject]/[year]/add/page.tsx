@@ -7,14 +7,16 @@ import Layout from '../../../../../../../components/Layout'; // Adjust path
 import { useAuth } from '../../../../../../../context/AuthContext'; // Adjust path
 import axiosInstance from '../../../../../../../lib/axios'; // Adjust path
 import { useRouter, useParams } from 'next/navigation';
-import { ShieldAlert, PlusCircle, Save, Loader2, AlertCircle, CheckCircle, Image as ImageIcon, FileText as FileTextIcon, Type, Link as LinkIcon } from 'lucide-react'; // Added icons
+import { 
+    ShieldAlert, PlusCircle, Save, Loader2, AlertCircle, CheckCircle, 
+    Image as ImageIcon, FileText as FileTextIcon, Type, Link as LinkIcon 
+} from 'lucide-react';
 
-// --- NEW: Define Option Type for State ---
+// Option Type (Same as V2)
 interface OptionState {
     text: string;
     imageUrl: string;
 }
-// -----------------------------------------
 
 export default function AddQuestionPage() {
     const { user, isLoading: isAuthLoading } = useAuth();
@@ -25,88 +27,115 @@ export default function AddQuestionPage() {
     const subject = params.subject ? decodeURIComponent(params.subject as string) : null;
     const year = params.year ? parseInt(decodeURIComponent(params.year as string), 10) : null;
 
-    // Form state
+    // --- UPDATED: Form state ---
     const [questionText, setQuestionText] = useState('');
-    // --- UPDATED: Options state uses the new interface ---
     const [options, setOptions] = useState<OptionState[]>([
         { text: '', imageUrl: '' }, { text: '', imageUrl: '' }, { text: '', imageUrl: '' }, { text: '', imageUrl: '' }
     ]);
-    // ----------------------------------------------------
-    const [correctAnswerText, setCorrectAnswerText] = useState(''); // Store the TEXT of the correct answer
+    // --- CHANGED: Renamed state to be more generic ---
+    const [correctAnswerValue, setCorrectAnswerValue] = useState(''); 
+    // ------------------------------------------------
     const [contextImageUrl, setContextImageUrl] = useState('');
     const [contextText, setContextText] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-     // Role Check
+     // Role Check (Same)
     useEffect(() => {
         if (!isAuthLoading && user?.role !== 'admin') {
             router.push('/dashboard');
         }
      }, [user, isAuthLoading, router]);
 
-    // Loading / Access Denied / Missing Params States
-     if (isAuthLoading || !user) { /* ... */ return <Layout>Loading...</Layout> }
-     if (user.role !== 'admin') { /* ... */ return <Layout>Access Denied</Layout> }
-     if (!level || !subject || year === null || isNaN(year)) { /* ... */ return <Layout>Invalid params</Layout> }
+    // Loading / Access Denied / Missing Params States (Same)
+     if (isAuthLoading || !user) { return <Layout>Loading...</Layout>; }
+     if (user.role !== 'admin') { return <Layout>Access Denied</Layout>; }
+     if (!level || !subject || year === null || isNaN(year)) { return <Layout>Invalid params</Layout>; }
 
-    // --- UPDATED Handlers ---
+    // --- UPDATED: Option Handler ---
     const handleOptionChange = (index: number, field: 'text' | 'imageUrl', value: string) => {
         const newOptions = [...options];
         newOptions[index] = { ...newOptions[index], [field]: value };
 
-        // Simple logic: If user types text, clear image URL, and vice-versa
         if (field === 'text' && value.trim()) {
             newOptions[index].imageUrl = '';
         } else if (field === 'imageUrl' && value.trim()) {
             newOptions[index].text = '';
         }
 
-        // If the TEXT of the currently selected correct answer was changed, clear correctAnswerText
-        if (correctAnswerText === options[index].text && field === 'text' && value !== correctAnswerText) {
-            setCorrectAnswerText('');
+        // --- CHANGED: Check against the new state name ---
+        // If the value of the currently selected correct answer was just changed, clear selection
+        if (correctAnswerValue === (field === 'text' ? options[index].text : options[index].imageUrl)) {
+            setCorrectAnswerValue('');
         }
+        // --------------------------------------------------
 
         setOptions(newOptions);
     };
 
+    // --- UPDATED: Correct Answer Handler ---
     const handleCorrectAnswerChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-        // We store the TEXT of the selected option
-        setCorrectAnswerText(event.target.value);
+        // We store the TEXT *or* the IMAGE URL of the selected option
+        setCorrectAnswerValue(event.target.value);
     };
-    // -------------------------
+    // ----------------------------------------
 
-    // --- UPDATED Submit Handler ---
+    // --- UPDATED: Submit Handler ---
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setError(null); setSuccessMessage(null);
 
-        // --- Validation for new structure ---
+        // --- Validation (Same as V2) ---
         if (!questionText.trim()) { setError('Question text required.'); return; }
 
-        const validOptions = options.filter(opt => (opt.text.trim() || opt.imageUrl.trim()) && !(opt.text.trim() && opt.imageUrl.trim()));
-        if (validOptions.length !== 4) { setError('All 4 options require EITHER text OR an image URL (not both).'); return; }
+        const validOptions = options.filter(opt => 
+            (opt.text.trim() || opt.imageUrl.trim()) && 
+            !(opt.text.trim() && opt.imageUrl.trim())
+        );
+        
+        if (validOptions.length !== 4) { 
+            setError('All 4 options require EITHER text OR an image URL (not both).'); 
+            return; 
+        }
 
-        const uniqueTexts = new Set(validOptions.filter(opt => opt.text).map(opt => opt.text.trim()));
-        if (uniqueTexts.size !== validOptions.filter(opt => opt.text).length) { setError('Option texts must be unique.'); return; }
-        // Note: Could add validation for unique image URLs too if needed
+        const textOptions = validOptions.filter(opt => opt.text).map(opt => opt.text.trim());
+        const uniqueTexts = new Set(textOptions);
+        if (uniqueTexts.size !== textOptions.length) { 
+            setError('Option texts must be unique.'); 
+            return; 
+        }
+        // --- End Validation (Same as V2) ---
 
-        if (!correctAnswerText) { setError('Correct answer required.'); return; }
-        if (!validOptions.some(opt => opt.text.trim() === correctAnswerText.trim())) { setError('Correct answer text must match the text of one option.'); return; }
-        // -----------------------------------
+
+        // --- CHANGED: Validate the new correct answer value ---
+        if (!correctAnswerValue) { 
+            setError('Correct answer selection is required.'); 
+            return; 
+        }
+        // Check that the selected value (text OR url) exists in our valid options
+        const isAnswerValid = validOptions.some(opt => 
+            opt.text.trim() === correctAnswerValue || 
+            opt.imageUrl.trim() === correctAnswerValue
+        );
+        if (!isAnswerValid) { 
+            setError('Correct answer must match one of the options.'); 
+            return; 
+        }
+        // ------------------------------------------------------
 
         setIsSubmitting(true);
 
-        // Prepare payload with the correct structure
         const payload = {
             grade: level, subject: subject, year: year,
             question: questionText.trim(),
             options: validOptions.map(opt => ({
-                text: opt.text.trim() || null, // Send null if empty
-                imageUrl: opt.imageUrl.trim() || null // Send null if empty
+                text: opt.text.trim() || null, 
+                imageUrl: opt.imageUrl.trim() || null 
             })),
-            correctAnswer: correctAnswerText.trim(), // Send the text
+            // --- CHANGED: Send the string value (text or URL) ---
+            correctAnswer: correctAnswerValue.trim(),
+            // ----------------------------------------------------
             contextImageUrl: contextImageUrl.trim() || null,
             contextText: contextText.trim() || null,
         };
@@ -116,29 +145,38 @@ export default function AddQuestionPage() {
         try {
             await axiosInstance.post('/admin/questions', payload);
             setSuccessMessage('Question added successfully!');
-            // Clear form (Optional)
-            setQuestionText(''); setOptions([{ text: '', imageUrl: '' }, { text: '', imageUrl: '' }, { text: '', imageUrl: '' }, { text: '', imageUrl: '' }]);
-            setCorrectAnswerText(''); setContextImageUrl(''); setContextText('');
-            // Redirect back after delay
+            
+            // Clear form
+            setQuestionText(''); 
+            setOptions([{ text: '', imageUrl: '' }, { text: '', imageUrl: '' }, { text: '', imageUrl: '' }, { text: '', imageUrl: '' }]);
+            // --- CHANGED: Clear new state ---
+            setCorrectAnswerValue(''); 
+            // --------------------------------
+            setContextImageUrl(''); 
+            setContextText('');
+            
             setTimeout(() => {
-                router.push(`/admin/questions/${encodeURIComponent(level)}/${encodeURIComponent(subject)}/${year}`);
+                router.push(`/admin/questions/${encodeURIComponent(level!)}/${encodeURIComponent(subject!)}/${year}`);
             }, 1500);
 
         } catch (err: any) {
             console.error("Failed to add question:", err);
             setError(err.response?.data?.message || "Error adding question.");
-             if (err.response?.data?.errors) { setError(`Validation failed: ${err.response.data.errors.join(', ')}`); }
-        } finally { setIsSubmitting(false); }
+             if (err.response?.data?.errors) { 
+                 setError(`Validation failed: ${err.response.data.errors.join(', ')}`); 
+             }
+        } finally { 
+            setIsSubmitting(false); 
+        }
     };
     // ------------------------------
 
 
     return (
         <Layout>
-             {/* Title & Breadcrumbs */}
+             {/* Title & Breadcrumbs (No Change) */}
              <div className="mb-6">
-                 {/* Breadcrumbs */}
-                 <div className="text-sm text-gray-500 dark:text-gray-400 mb-2 space-x-1">
+                <div className="text-sm text-gray-500 dark:text-gray-400 mb-2 space-x-1">
                      <button onClick={() => router.push('/admin/questions')} className="hover:underline">Levels</button> <span>/</span>
                      <button onClick={() => router.push(`/admin/questions/${encodeURIComponent(level!)}`)} className="hover:underline">{level}</button> <span>/</span>
                      <button onClick={() => router.push(`/admin/questions/${encodeURIComponent(level!)}/${encodeURIComponent(subject!)}`)} className="hover:underline">{subject}</button> <span>/</span>
@@ -154,82 +192,126 @@ export default function AddQuestionPage() {
                     {error && (<div className="alert-error"><AlertCircle size={18} /> {error}</div>)}
                     {successMessage && (<div className="alert-success"><CheckCircle size={18} /> {successMessage}</div>)}
 
-                    {/* Context Fields (No change) */}
-                    <fieldset className="border dark:border-gray-600 rounded-md p-4"> /* ... */ </fieldset>
+                    {/* Context Fields (No Change) */}
+                    <fieldset className="border dark:border-gray-600 rounded-md p-4">
+                        <legend className="text-sm font-medium text-gray-600 dark:text-gray-400 px-2">Optional Context (Shared Image/Text)</legend>
+                        <div className="space-y-4">
+                             <div>
+                                <label htmlFor="contextImageUrl" className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300 flex items-center gap-1">
+                                   <ImageIcon size={14}/> Context Image URL (Optional)
+                                </label>
+                                <input id="contextImageUrl" type="url" value={contextImageUrl} onChange={(e) => setContextImageUrl(e.target.value)} className="w-full input-style" placeholder="https://example.com/diagram.png" />
+                                {contextImageUrl && ( <img src={contextImageUrl} alt="Context Preview" className="mt-2 max-h-40 rounded border dark:border-gray-600" onError={(e) => e.currentTarget.style.display='none'} onLoad={(e) => e.currentTarget.style.display='block'}/> )}
+                             </div>
+                             <div>
+                                <label htmlFor="contextText" className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300 flex items-center gap-1">
+                                   <FileTextIcon size={14}/> Context Text (Optional Passage)
+                                </label>
+                                <textarea id="contextText" rows={3} value={contextText} onChange={(e) => setContextText(e.target.value)} className="w-full input-style" placeholder="Enter shared text passage here..." />
+                            </div>
+                        </div>
+                    </fieldset>
 
-                    {/* Question Text (No change) */}
-                    <div> /* ... */ </div>
+                    {/* Question Text (No Change) */}
+                    <div>
+                        <label htmlFor="questionText" className="label-style"> Question Text <span className="text-red-500">*</span> </label>
+                        <textarea id="questionText" rows={4} value={questionText} onChange={(e) => setQuestionText(e.target.value)} required className="w-full input-style" placeholder="Enter the question here..."/>
+                    </div>
 
-                    {/* --- UPDATED Options Inputs --- */}
+                    {/* Options Inputs (No Change) */}
                     <div className="space-y-5">
                          <label className="label-style"> Options (Provide EITHER text OR image URL for each) <span className="text-red-500">*</span> </label>
                         {options.map((option, index) => (
                             <div key={index} className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 border dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50">
                                 <span className="font-semibold text-gray-500 dark:text-gray-400">{String.fromCharCode(65 + index)}:</span>
-                                {/* Text Input */}
+                                
                                 <div className="flex-1 w-full">
                                     <label htmlFor={`optionText${index}`} className="sr-only">Option {String.fromCharCode(65 + index)} Text</label>
                                     <div className="relative">
-                                        <Type className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={16}/>
+                                        <Type className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={16}/>
                                         <input
-                                            id={`optionText${index}`}
-                                            type="text"
-                                            value={option.text}
+                                            id={`optionText${index}`} type="text" value={option.text}
                                             onChange={(e) => handleOptionChange(index, 'text', e.target.value)}
-                                            className="w-full input-style pl-8" // Add padding for icon
+                                            className="w-full input-style pl-8" 
                                             placeholder={`Text for Option ${String.fromCharCode(65 + index)}`}
-                                            disabled={!!option.imageUrl.trim()} // Disable if imageUrl has content
+                                            disabled={!!option.imageUrl.trim()}
                                          />
                                     </div>
                                 </div>
+                                
                                 <span className='text-xs text-gray-500 dark:text-gray-400 self-center'>OR</span>
-                                {/* Image URL Input */}
+                                
                                 <div className="flex-1 w-full">
                                      <label htmlFor={`optionImageUrl${index}`} className="sr-only">Option {String.fromCharCode(65 + index)} Image URL</label>
                                      <div className="relative">
-                                         <LinkIcon className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={16}/>
+                                         <LinkIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={16}/>
                                         <input
-                                            id={`optionImageUrl${index}`}
-                                            type="url"
-                                            value={option.imageUrl}
+                                            id={`optionImageUrl${index}`} type="url" value={option.imageUrl}
                                             onChange={(e) => handleOptionChange(index, 'imageUrl', e.target.value)}
-                                            className="w-full input-style pl-8" // Add padding for icon
+                                            className="w-full input-style pl-8"
                                             placeholder={`Image URL for Option ${String.fromCharCode(65 + index)}`}
-                                            disabled={!!option.text.trim()} // Disable if text has content
+                                            disabled={!!option.text.trim()}
                                         />
                                      </div>
-                                      {/* Basic Image Preview */}
                                       {option.imageUrl && <img src={option.imageUrl} alt={`Preview ${index}`} className="mt-2 max-h-20 rounded border dark:border-gray-500"/>}
                                 </div>
                             </div>
                         ))}
                     </div>
-                    {/* ----------------------------- */}
 
                     {/* --- UPDATED Correct Answer Selection --- */}
                     <div>
-                        <label htmlFor="correctAnswer" className="label-style"> Correct Answer (Select by Text) <span className="text-red-500">*</span> </label>
-                        <select id="correctAnswer" value={correctAnswerText} onChange={handleCorrectAnswerChange} required className="w-full select-style">
+                        <label htmlFor="correctAnswer" className="label-style"> Correct Answer <span className="text-red-500">*</span> </label>
+                        <select id="correctAnswer" value={correctAnswerValue} onChange={handleCorrectAnswerChange} required className="w-full select-style">
                             <option value="" disabled>-- Select Correct Answer --</option>
-                            {/* Filter only options that have text */}
-                            {options.filter(opt => opt.text.trim()).map((option, index) => (
-                                <option key={index} value={option.text.trim()}>
-                                    {/* Find original index for A/B/C/D */}
-                                    {String.fromCharCode(65 + options.findIndex(o => o === option))}: {option.text.trim()}
-                                </option>
-                            ))}
+                            
+                            {/* Filter only options that are valid (have text OR an image) */}
+                            {options
+                                .filter(opt => opt.text.trim() || opt.imageUrl.trim())
+                                .map((option, index) => {
+                                    // Find original index for A/B/C/D
+                                    const originalIndex = options.findIndex(o => o === option);
+                                    const isImage = !!option.imageUrl.trim();
+                                    const optionValue = isImage ? option.imageUrl.trim() : option.text.trim();
+                                    
+                                    return (
+                                        <option key={originalIndex} value={optionValue}>
+                                            {String.fromCharCode(65 + originalIndex)}: {isImage ? '(Image) ' + optionValue : optionValue}
+                                        </option>
+                                    );
+                                })}
                         </select>
-                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Note: Image options cannot be selected as correct answer currently.</p>
+                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">You can now select text or image-based answers.</p>
                     </div>
                     {/* ------------------------------------- */}
 
                     {/* Submit Button (No change) */}
-                    <div className="flex justify-end pt-4"> /* ... */ </div>
+                    <div className="flex justify-end pt-4">
+                        <button type="submit" disabled={isSubmitting} className="button-primary disabled:opacity-50 disabled:cursor-wait">
+                            {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                            {isSubmitting ? 'Saving...' : 'Save Question'}
+                        </button>
+                    </div>
 
                 </form>
             </div>
+             
              {/* Styles (same as before) */}
-             <style jsx>{` /* ... */ `}</style>
+             <style jsx>{`
+                .label-style { display: block; margin-bottom: 0.25rem; font-size: 0.875rem; font-weight: 500; color: #374151; }
+                .dark .label-style { color: #D1D5DB; }
+                .input-style, .select-style { display: block; width: 100%; padding: 0.5rem 0.75rem; border-radius: 0.5rem; transition: all 0.2s; background-color: #F9FAFB; color: #111827; border: 1px solid #D1D5DB; }
+                .dark .input-style, .dark .select-style { background-color: #374151; color: #F9FAFB; border-color: #4B5563; }
+                .input-style:focus, .select-style:focus { border-color: #3B82F6; outline: none; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
+                .input-style.pl-8 { padding-left: 2.25rem; } 
+                .select-style { appearance: none; }
+                .button-primary { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.5rem; background-color: #16A34A; color: white; border-radius: 0.5rem; font-weight: 600; transition: background-color 0.2s; }
+                .button-primary:hover:not(:disabled) { background-color: #15803D; }
+                .alert-error { padding: 0.75rem; border-radius: 0.5rem; background-color: #FEF2F2; color: #B91C1C; display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; border: 1px solid #F87171; }
+                .dark .alert-error { background-color: rgba(185, 28, 28, 0.2); color: #F87171; border-color: rgba(185, 28, 28, 0.5); }
+                .alert-success { padding: 0.75rem; border-radius: 0.5rem; background-color: #F0FDF4; color: #15803D; display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; border: 1px solid #86EFAC; }
+                .dark .alert-success { background-color: rgba(21, 128, 61, 0.2); color: #86EFAC; border-color: rgba(21, 128, 61, 0.5); }
+            `}</style>
         </Layout>
     );
 }
