@@ -5,38 +5,20 @@ const Attempt = require('../models/Attempt.js'); // Assuming you'll use this lat
 
 /**
  * @desc    Get available paper filter options (grades, subjects, years)
- * This is now dynamic based on query parameters.
  * @route   GET /api/papers/filters
  * @access  Private (Assumes user must be logged in to see options)
  */
 const getPaperFilters = async (req, res) => {
-  // Check for query parameters from the frontend
-  const { grade, subject } = req.query;
-
   try {
-    // 1. If no query params, just send the distinct grades.
-    if (!grade && !subject) {
-      const grades = await Question.distinct('grade').sort();
-      // Send empty arrays for subjects and years; frontend will ask for them later.
-      res.json({ grades, subjects: [], years: [] });
-    } 
-    // 2. If a 'grade' is provided, send the distinct subjects *for that grade*.
-    else if (grade && !subject) {
-      const filterCriteria = { grade: grade };
-      const subjects = await Question.distinct('subject', filterCriteria).sort();
-      res.json({ subjects, years: [] }); // Send only subjects
-    } 
-    // 3. If 'grade' AND 'subject' are provided, send the distinct years *for that combination*.
-    else if (grade && subject) {
-      const filterCriteria = { grade: grade, subject: subject };
-      const years = await Question.distinct('year', filterCriteria).sort({ year: -1 });
-      res.json({ years }); // Send only years
-    } 
-    // Handle any invalid combination of query params
-    else {
-      res.status(400).json({ message: 'Invalid filter query combination' });
-    }
+    // Fetch distinct values directly from the database using the correct field names
+    const years = await Question.distinct('year').sort({ year: -1 });
+    const subjects = await Question.distinct('subject').sort();
+    const grades = await Question.distinct('grade').sort(); // Use 'grade' based on updated schema
 
+    // Log fetched filters for debugging
+    // console.log("Fetched Filters:", { years, subjects, grades });
+
+    res.json({ years, subjects, grades });
   } catch (error) {
     console.error('Error fetching paper filters:', error);
     res.status(500).json({ message: 'Server Error fetching filters' });
@@ -47,7 +29,6 @@ const getPaperFilters = async (req, res) => {
  * @desc    Start a new paper attempt: find questions, create Attempt document
  * @route   POST /api/papers/start
  * @access  Private
- * (This function is identical to V1)
  */
 const startPaper = async (req, res) => {
   const userId = req.user._id; // Get user ID from authenticated request (provided by 'protect' middleware)
@@ -76,10 +57,8 @@ const startPaper = async (req, res) => {
 
   try {
     // Find questions matching the exact criteria using the corrected field names
-    // --- UPDATED: We now select contextImageUrl and contextText as well ---
     const questions = await Question.find(queryCriteria)
-                                    .select('_id question options contextImageUrl contextText'); 
-    // -----------------------------------------------------------------
+                                    .select('_id question options'); // Select only needed fields for the quiz
 
     // Check if any questions were found
     if (!questions || questions.length === 0) {
@@ -90,11 +69,11 @@ const startPaper = async (req, res) => {
     console.log(`Found ${questions.length} questions.`);
 
     // --- Create a new Attempt document ---
-    // Prepare answers array structure (initially with empty string answers)
-    const initialAnswers = questions.map(q => ({
-      questionId: q._id,
-      userAnswer: '' // Use empty string instead of null
-    }));
+// Prepare answers array structure (initially with empty string answers)
+const initialAnswers = questions.map(q => ({
+  questionId: q._id,
+  userAnswer: '' // Use empty string instead of null
+}));
 
     const newAttempt = new Attempt({
       user: userId,
@@ -122,7 +101,7 @@ const startPaper = async (req, res) => {
     // Log errors during the process
     console.error('Error starting paper:', error);
     console.error('Query Criteria at time of error:', queryCriteria); // Log criteria again on error
-    res.status(5.00).json({ message: 'Server Error starting paper' });
+    res.status(500).json({ message: 'Server Error starting paper' });
   }
 };
 
