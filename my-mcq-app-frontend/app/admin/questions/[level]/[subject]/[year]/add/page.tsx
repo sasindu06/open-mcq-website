@@ -27,14 +27,13 @@ export default function AddQuestionPage() {
     const subject = params.subject ? decodeURIComponent(params.subject as string) : null;
     const year = params.year ? parseInt(decodeURIComponent(params.year as string), 10) : null;
 
-    // --- UPDATED: Form state ---
+    // --- UPDATED: Form state (Added 5th option) ---
     const [questionText, setQuestionText] = useState('');
     const [options, setOptions] = useState<OptionState[]>([
-        { text: '', imageUrl: '' }, { text: '', imageUrl: '' }, { text: '', imageUrl: '' }, { text: '', imageUrl: '' }
+        { text: '', imageUrl: '' }, { text: '', imageUrl: '' }, { text: '', imageUrl: '' }, { text: '', imageUrl: '' }, { text: '', imageUrl: '' }
     ]);
-    // --- CHANGED: Renamed state to be more generic ---
+    // -------------------------------------------------
     const [correctAnswerValue, setCorrectAnswerValue] = useState(''); 
-    // ------------------------------------------------
     const [contextImageUrl, setContextImageUrl] = useState('');
     const [contextText, setContextText] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,7 +52,7 @@ export default function AddQuestionPage() {
      if (user.role !== 'admin') { return <Layout>Access Denied</Layout>; }
      if (!level || !subject || year === null || isNaN(year)) { return <Layout>Invalid params</Layout>; }
 
-    // --- UPDATED: Option Handler ---
+    // --- UPDATED: Option Handler (No change, works as-is) ---
     const handleOptionChange = (index: number, field: 'text' | 'imageUrl', value: string) => {
         const newOptions = [...options];
         newOptions[index] = { ...newOptions[index], [field]: value };
@@ -64,19 +63,15 @@ export default function AddQuestionPage() {
             newOptions[index].text = '';
         }
 
-        // --- CHANGED: Check against the new state name ---
-        // If the value of the currently selected correct answer was just changed, clear selection
         if (correctAnswerValue === (field === 'text' ? options[index].text : options[index].imageUrl)) {
             setCorrectAnswerValue('');
         }
-        // --------------------------------------------------
 
         setOptions(newOptions);
     };
 
-    // --- UPDATED: Correct Answer Handler ---
+    // --- UPDATED: Correct Answer Handler (No change, works as-is) ---
     const handleCorrectAnswerChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-        // We store the TEXT *or* the IMAGE URL of the selected option
         setCorrectAnswerValue(event.target.value);
     };
     // ----------------------------------------
@@ -86,18 +81,22 @@ export default function AddQuestionPage() {
         e.preventDefault();
         setError(null); setSuccessMessage(null);
 
-        // --- Validation (Same as V2) ---
+        // --- Validation (UPDATED) ---
         if (!questionText.trim()) { setError('Question text required.'); return; }
 
+        // Filter for options that are validly filled (EITHER text OR image)
         const validOptions = options.filter(opt => 
             (opt.text.trim() || opt.imageUrl.trim()) && 
             !(opt.text.trim() && opt.imageUrl.trim())
         );
         
-        if (validOptions.length !== 4) { 
-            setError('All 4 options require EITHER text OR an image URL (not both).'); 
+        // --- THIS IS THE CHANGE ---
+        // We now check for 4 OR 5 valid options
+        if (validOptions.length !== 4 && validOptions.length !== 5) { 
+            setError('You must provide 4 or 5 options, each with EITHER text OR an image URL (not both).'); 
             return; 
         }
+        // --------------------------
 
         const textOptions = validOptions.filter(opt => opt.text).map(opt => opt.text.trim());
         const uniqueTexts = new Set(textOptions);
@@ -105,7 +104,7 @@ export default function AddQuestionPage() {
             setError('Option texts must be unique.'); 
             return; 
         }
-        // --- End Validation (Same as V2) ---
+        // --- End Validation ---
 
 
         // --- CHANGED: Validate the new correct answer value ---
@@ -113,7 +112,6 @@ export default function AddQuestionPage() {
             setError('Correct answer selection is required.'); 
             return; 
         }
-        // Check that the selected value (text OR url) exists in our valid options
         const isAnswerValid = validOptions.some(opt => 
             opt.text.trim() === correctAnswerValue || 
             opt.imageUrl.trim() === correctAnswerValue
@@ -129,13 +127,13 @@ export default function AddQuestionPage() {
         const payload = {
             grade: level, subject: subject, year: year,
             question: questionText.trim(),
+            // --- UPDATED: Send only the validly filled options ---
             options: validOptions.map(opt => ({
                 text: opt.text.trim() || null, 
                 imageUrl: opt.imageUrl.trim() || null 
             })),
-            // --- CHANGED: Send the string value (text or URL) ---
+            // -----------------------------------------------------
             correctAnswer: correctAnswerValue.trim(),
-            // ----------------------------------------------------
             contextImageUrl: contextImageUrl.trim() || null,
             contextText: contextText.trim() || null,
         };
@@ -146,12 +144,11 @@ export default function AddQuestionPage() {
             await axiosInstance.post('/admin/questions', payload);
             setSuccessMessage('Question added successfully!');
             
-            // Clear form
+            // --- UPDATED: Clear form (reset to 5) ---
             setQuestionText(''); 
-            setOptions([{ text: '', imageUrl: '' }, { text: '', imageUrl: '' }, { text: '', imageUrl: '' }, { text: '', imageUrl: '' }]);
-            // --- CHANGED: Clear new state ---
+            setOptions([{ text: '', imageUrl: '' }, { text: '', imageUrl: '' }, { text: '', imageUrl: '' }, { text: '', imageUrl: '' }, { text: '', imageUrl: '' }]);
+            // ------------------------------------------
             setCorrectAnswerValue(''); 
-            // --------------------------------
             setContextImageUrl(''); 
             setContextText('');
             
@@ -218,9 +215,12 @@ export default function AddQuestionPage() {
                         <textarea id="questionText" rows={4} value={questionText} onChange={(e) => setQuestionText(e.target.value)} required className="w-full input-style" placeholder="Enter the question here..."/>
                     </div>
 
-                    {/* Options Inputs (No Change) */}
+                    {/* Options Inputs (No Change - .map() now renders 5) */}
                     <div className="space-y-5">
-                         <label className="label-style"> Options (Provide EITHER text OR image URL for each) <span className="text-red-500">*</span> </label>
+                         <label className="label-style"> 
+                            Options (Provide EITHER text OR image URL for 4 or 5) 
+                            <span className="text-red-500">*</span> 
+                        </label>
                         {options.map((option, index) => (
                             <div key={index} className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 border dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50">
                                 <span className="font-semibold text-gray-500 dark:text-gray-400">{String.fromCharCode(65 + index)}:</span>
@@ -259,17 +259,15 @@ export default function AddQuestionPage() {
                         ))}
                     </div>
 
-                    {/* --- UPDATED Correct Answer Selection --- */}
+                    {/* --- UPDATED Correct Answer Selection (No change, works as-is) --- */}
                     <div>
                         <label htmlFor="correctAnswer" className="label-style"> Correct Answer <span className="text-red-500">*</span> </label>
                         <select id="correctAnswer" value={correctAnswerValue} onChange={handleCorrectAnswerChange} required className="w-full select-style">
                             <option value="" disabled>-- Select Correct Answer --</option>
                             
-                            {/* Filter only options that are valid (have text OR an image) */}
                             {options
                                 .filter(opt => opt.text.trim() || opt.imageUrl.trim())
                                 .map((option, index) => {
-                                    // Find original index for A/B/C/D
                                     const originalIndex = options.findIndex(o => o === option);
                                     const isImage = !!option.imageUrl.trim();
                                     const optionValue = isImage ? option.imageUrl.trim() : option.text.trim();

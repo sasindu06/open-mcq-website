@@ -8,50 +8,120 @@ import axiosInstance from '../../lib/axios';
 import { ChevronDown, ArrowRight, BookOpen, Calendar, GraduationCap } from 'lucide-react';
 import { useRouter } from 'next/navigation'; // Import useRouter
 
-// Define the shape of our filter data
-interface PaperFilters {
-  grades: string[];
-  subjects: string[];
-  years: string[];
-}
-
 export default function PapersPage() {
   const router = useRouter(); // Get the router instance
-  const [filters, setFilters] = useState<PaperFilters>({ grades: [], subjects: [], years: [] });
-  const [isLoading, setIsLoading] = useState(true);
-  const [apiError, setApiError] = useState<string | null>(null); // For API errors
+  
+  const [grades, setGrades] = useState<string[]>([]);
+  const [subjects, setSubjects] = useState<string[]>([]);
+  const [years, setYears] = useState<string[]>([]);
 
   const [selectedGrade, setSelectedGrade] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
   const [selectedYear, setSelectedYear] = useState('');
 
-  // Fetch filter data when the component loads
+  const [isGradesLoading, setIsGradesLoading] = useState(true);
+  const [isSubjectsLoading, setIsSubjectsLoading] = useState(false);
+  const [isYearsLoading, setIsYearsLoading] = useState(false);
+  const [isStartingQuiz, setIsStartingQuiz] = useState(false); 
+  
+  const [apiError, setApiError] = useState<string | null>(null);
+
+  // 1. Fetch initial grades on component mount
   useEffect(() => {
-    const fetchFilters = async () => {
+    const fetchGrades = async () => {
+      console.log("--- FRONTEND v5: Fetching grades ---"); // New debug line
+      setIsGradesLoading(true);
+      setApiError(null);
       try {
-        const response = await axiosInstance.get<PaperFilters>('/papers/filters');
-        setFilters(response.data);
+        const response = await axiosInstance.get('/papers/filters');
+        setGrades(response.data.grades || []);
+        console.log("--- FRONTEND v5: Grades loaded:", response.data.grades); // New debug line
       } catch (err) {
-        setApiError('Failed to load paper options. Please try again later.');
+        setApiError('Failed to load grade options. Please try again later.');
         console.error(err);
       } finally {
-        setIsLoading(false);
+        setIsGradesLoading(false);
       }
     };
-    fetchFilters();
-  }, []);
+    fetchGrades();
+  }, []); // Runs only once on mount
 
-  // Updated function to start the quiz
+  // 2. Fetch subjects *whenever selectedGrade changes*
+  useEffect(() => {
+    if (!selectedGrade) {
+      setSubjects([]);
+      return;
+    }
+    
+    // --- THIS IS THE KEY FUNCTION ---
+    const fetchSubjects = async () => {
+      console.log(`--- FRONTEND v5: Grade changed to "${selectedGrade}". Fetching subjects... ---`); // New debug line
+      setIsSubjectsLoading(true);
+      setApiError(null);
+      try {
+        const response = await axiosInstance.get(`/papers/filters?grade=${selectedGrade}`);
+        setSubjects(response.data.subjects || []);
+        console.log("--- FRONTEND v5: Subjects loaded:", response.data.subjects); // New debug line
+      } catch (err) {
+        setApiError('Failed to load subject options. Please try again later.');
+        console.error("--- FRONTEND v5 ERROR fetching subjects:", err); // New debug line
+      } finally {
+        setIsSubjectsLoading(false);
+      }
+    };
+    fetchSubjects();
+  }, [selectedGrade]); // This hook depends on selectedGrade
+
+  // 3. Fetch years *whenever selectedSubject or selectedGrade changes*
+  useEffect(() => {
+    if (!selectedGrade || !selectedSubject) {
+      setYears([]);
+      return;
+    }
+
+    const fetchYears = async () => {
+      console.log(`--- FRONTEND v5: Subject changed to "${selectedSubject}". Fetching years... ---`); // New debug line
+      setIsYearsLoading(true);
+      setApiError(null);
+      try {
+        const response = await axiosInstance.get(`/papers/filters?grade=${selectedGrade}&subject=${selectedSubject}`);
+        setYears(response.data.years || []);
+        console.log("--- FRONTEND v5: Years loaded:", response.data.years); // New debug line
+      } catch (err) {
+        setApiError('Failed to load year options. Please try again later.');
+        console.error("--- FRONTEND v5 ERROR fetching years:", err); // New debug line
+      } finally {
+        setIsYearsLoading(false);
+      }
+    };
+    fetchYears();
+  }, [selectedGrade, selectedSubject]); // This hook depends on both values
+
+  // --- Handler Functions ---
+
+  const handleGradeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedGrade(e.target.value);
+    setSelectedSubject('');
+    setSelectedYear('');
+    setSubjects([]); 
+    setYears([]); 
+  };
+
+  const handleSubjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedSubject(e.target.value);
+    setSelectedYear('');
+    setYears([]); 
+  };
+
   const handleStartQuiz = async () => {
     if (!selectedGrade || !selectedSubject || !selectedYear) {
       alert("Please make all selections before starting.");
       return;
     }
     setApiError(null);
-    setIsLoading(true); // Set loading state for the button
+    setIsStartingQuiz(true); 
 
     try {
-      // Call the new backend endpoint
       const response = await axiosInstance.post('/papers/start', {
         grade: selectedGrade,
         subject: selectedSubject,
@@ -59,17 +129,16 @@ export default function PapersPage() {
       });
 
       const { attemptId } = response.data;
-
-      // Redirect to the new quiz page, passing the attemptId
       router.push(`/quiz/${attemptId}`);
 
     } catch (err: any) {
       console.error("Failed to start quiz:", err);
       setApiError(err.response?.data?.message || "Failed to start quiz. Please try again.");
-      setIsLoading(false); // Stop loading on error
+      setIsStartingQuiz(false); 
     }
   };
 
+  // --- JSX (Rendering) ---
   return (
     <Layout>
       {/* Title Section */}
@@ -83,7 +152,7 @@ export default function PapersPage() {
       </div>
 
       {/* Main Content Area */}
-      {isLoading && !filters.grades.length ? ( // Show initial loading message
+      {isGradesLoading ? ( 
         <p className="text-center text-gray-500">Loading paper options...</p>
       ) : (
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-10 mb-6 max-w-2xl mx-auto">
@@ -96,11 +165,11 @@ export default function PapersPage() {
             <div className="relative">
               <select
                 value={selectedGrade}
-                onChange={(e) => setSelectedGrade(e.target.value)}
+                onChange={handleGradeChange} // Use new handler
                 className="w-full px-4 py-4 rounded-xl appearance-none cursor-pointer bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-600 focus:border-blue-500 outline-none pr-10"
               >
                 <option value="">Select Grade Level</option>
-                {filters.grades.map((grade) => <option key={grade} value={grade}>{grade}</option>)}
+                {grades.map((grade) => <option key={grade} value={grade}>{grade}</option>)}
               </select>
               <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 dark:text-gray-500" size={20} />
             </div>
@@ -114,12 +183,12 @@ export default function PapersPage() {
             <div className="relative">
               <select
                 value={selectedSubject}
-                onChange={(e) => setSelectedSubject(e.target.value)}
-                disabled={!selectedGrade}
+                onChange={handleSubjectChange} 
+                disabled={!selectedGrade || isSubjectsLoading} 
                 className="w-full px-4 py-4 rounded-xl appearance-none cursor-pointer bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-600 focus:border-blue-500 outline-none pr-10 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <option value="">Select Subject</option>
-                {filters.subjects.map((subject) => <option key={subject} value={subject}>{subject}</option>)}
+                <option value="">{isSubjectsLoading ? 'Loading...' : 'Select Subject'}</option>
+                {subjects.map((subject) => <option key={subject} value={subject}>{subject}</option>)}
               </select>
               <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 dark:text-gray-500" size={20} />
             </div>
@@ -133,12 +202,12 @@ export default function PapersPage() {
             <div className="relative">
               <select
                 value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}
-                disabled={!selectedSubject}
+                onChange={(e) => setSelectedYear(e.target.value)} 
+                disabled={!selectedSubject || isYearsLoading} 
                 className="w-full px-4 py-4 rounded-xl appearance-none cursor-pointer bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-600 focus:border-blue-500 outline-none pr-10 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <option value="">Select Year</option>
-                {filters.years.map((year) => <option key={year} value={year}>{year}</option>)}
+                <option value="">{isYearsLoading ? 'Loading...' : 'Select Year'}</option>
+                {years.map((year) => <option key={year} value={year}>{year}</option>)}
               </select>
               <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 dark:text-gray-500" size={20} />
             </div>
@@ -147,10 +216,10 @@ export default function PapersPage() {
           {/* Start Button */}
           <button
             onClick={handleStartQuiz}
-            disabled={!selectedGrade || !selectedSubject || !selectedYear || isLoading}
+            disabled={!selectedGrade || !selectedSubject || !selectedYear || isStartingQuiz} 
             className="w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all duration-200 bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] disabled:bg-gray-200 dark:disabled:bg-gray-700 disabled:text-gray-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed disabled:scale-100"
           >
-            {isLoading ? "Starting..." : "Start Quiz"} <ArrowRight size={20} />
+            {isStartingQuiz ? "Starting..." : "Start Quiz"} <ArrowRight size={20} />
           </button>
 
           {/* Display API errors here */}

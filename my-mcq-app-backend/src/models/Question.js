@@ -31,7 +31,12 @@ const questionSchema = new mongoose.Schema({
     type: [optionSchema], // Array of our new option type
     required: true,
     validate: [
-      { validator: (val) => val.length === 4, msg: 'Each question must have exactly 4 options.' },
+      // --- THIS IS THE CHANGE ---
+      { 
+        validator: (val) => val.length === 4 || val.length === 5, 
+        msg: 'Each question must have 4 or 5 options.' 
+      },
+      // --------------------------
     ]
   },
   // ------------------------------------------

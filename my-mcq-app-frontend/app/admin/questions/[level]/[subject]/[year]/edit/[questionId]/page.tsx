@@ -12,14 +12,14 @@ import {
     Image as ImageIcon, FileText as FileTextIcon, Type, Link as LinkIcon, Edit 
 } from 'lucide-react'; // Added icons
 
-// --- NEW: Define Option Type for State ---
+// --- Define Option Type for State (No Change) ---
 interface OptionState {
-    text: string | null; // Allow null
-    imageUrl: string | null; // Allow null
+    text: string | null;
+    imageUrl: string | null;
 }
 // -----------------------------------------
 
-// --- NEW: Define type for fetched question data ---
+// --- Define type for fetched question data (No Change) ---
 interface QuestionPayload {
     grade: string;
     subject: string;
@@ -43,51 +43,52 @@ export default function EditQuestionPage() {
     const year = params.year ? parseInt(decodeURIComponent(params.year as string), 10) : null;
     const questionId = params.questionId as string;
 
-    // --- UPDATED: Form state ---
+    // --- UPDATED: Form state (Initialize with 5) ---
     const [questionText, setQuestionText] = useState('');
     const [options, setOptions] = useState<OptionState[]>([
-        { text: '', imageUrl: '' }, { text: '', imageUrl: '' }, { text: '', imageUrl: '' }, { text: '', imageUrl: '' }
+        { text: '', imageUrl: '' }, { text: '', imageUrl: '' }, { text: '', imageUrl: '' }, { text: '', imageUrl: '' }, { text: '', imageUrl: '' }
     ]);
     const [correctAnswerValue, setCorrectAnswerValue] = useState(''); // Store the text OR the imageUrl
     const [contextImageUrl, setContextImageUrl] = useState('');
     const [contextText, setContextText] = useState('');
-    // ---------------------------
+    // -----------------------------------------------
 
-    const [isLoadingData, setIsLoadingData] = useState(true); // For initial fetch
+    const [isLoadingData, setIsLoadingData] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-     // Role Check
+     // Role Check (No Change)
     useEffect(() => {
         if (!isAuthLoading && user?.role !== 'admin') {
             router.push('/dashboard');
         }
      }, [user, isAuthLoading, router]);
 
-     // --- UPDATED: Fetch existing question data ---
+     // --- UPDATED: Fetch existing question data (for 5 options) ---
      useEffect(() => {
         if (questionId && user?.role === 'admin') {
             const fetchQuestion = async () => {
                 setIsLoadingData(true); setError(null);
                 try {
-                    // Use the new QuestionPayload interface
                     const response = await axiosInstance.get<QuestionPayload>(`/admin/questions/${questionId}`);
                     const data = response.data;
                     
-                    // Populate state with fetched data
                     setQuestionText(data.question);
                     
-                    // Ensure 4 options exist, even if data is incomplete
+                    // --- THIS IS THE CHANGE ---
+                    // Ensure 5 options exist, padding with empty if data has 4
                     const fetchedOptions = data.options || [];
                     setOptions([
                         { text: fetchedOptions[0]?.text || '', imageUrl: fetchedOptions[0]?.imageUrl || '' },
                         { text: fetchedOptions[1]?.text || '', imageUrl: fetchedOptions[1]?.imageUrl || '' },
                         { text: fetchedOptions[2]?.text || '', imageUrl: fetchedOptions[2]?.imageUrl || '' },
                         { text: fetchedOptions[3]?.text || '', imageUrl: fetchedOptions[3]?.imageUrl || '' },
+                        { text: fetchedOptions[4]?.text || '', imageUrl: fetchedOptions[4]?.imageUrl || '' }, // Add 5th option
                     ]);
+                    // --------------------------
                     
-                    setCorrectAnswerValue(data.correctAnswer); // Set the text or URL
+                    setCorrectAnswerValue(data.correctAnswer);
                     setContextImageUrl(data.contextImageUrl || '');
                     setContextText(data.contextText || '');
 
@@ -100,57 +101,49 @@ export default function EditQuestionPage() {
             };
             fetchQuestion();
         } else if (!isAuthLoading) {
-            setIsLoadingData(false); // Stop loading if no ID or not admin
+            setIsLoadingData(false);
         }
-     }, [questionId, user, isAuthLoading]); // Added isAuthLoading dependency
+     }, [questionId, user, isAuthLoading]);
      // ----------------------------------------
 
-    // Loading / Access Denied / Missing Params States
+    // Loading / Access Denied / Missing Params States (No Change)
     if (isAuthLoading || !user) { return <Layout><div className="loading-placeholder"><Loader2 className="animate-spin"/> Verifying access...</div></Layout>; }
     if (user.role !== 'admin') { return <Layout><div className="access-denied"><ShieldAlert/> Access Denied</div></Layout>; }
     if (!level || !subject || year === null || isNaN(year) || !questionId) { return <Layout>Invalid URL parameters.</Layout>; }
     if (isLoadingData) { return <Layout><div className="loading-placeholder"><Loader2 className="animate-spin"/> Loading question data...</div></Layout>; }
 
-    // --- UPDATED: Option Handler ---
+    // --- Option Handler (No Change, works for 5) ---
     const handleOptionChange = (index: number, field: 'text' | 'imageUrl', value: string) => {
         const newOptions = [...options];
         const currentOption = { ...newOptions[index] };
         
-        // Get the old value (text or URL) that might be the correct answer
         const oldIdentifier = (currentOption.text || currentOption.imageUrl || '').trim();
-
-        // Update the field
         currentOption[field] = value;
         
-        // "Either/Or" logic
         if (field === 'text' && value.trim()) {
             currentOption.imageUrl = '';
         } else if (field === 'imageUrl' && value.trim()) {
             currentOption.text = '';
         }
-        
         newOptions[index] = currentOption;
 
-        // If the value we just changed WAS the correct answer, clear it.
         if (correctAnswerValue && correctAnswerValue === oldIdentifier) {
             setCorrectAnswerValue('');
         }
         setOptions(newOptions);
     };
 
-    // --- UPDATED: Correct Answer Handler ---
+    // --- Correct Answer Handler (No Change, works for 5) ---
     const handleCorrectAnswerChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-        // We store the TEXT or URL of the selected option
         setCorrectAnswerValue(event.target.value);
     };
     // ------------------------------------
 
-    // --- UPDATED: Submit Handler ---
+    // --- UPDATED: Submit Handler (Validates 4 or 5) ---
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setError(null); setSuccessMessage(null);
 
-        // --- Validation for new structure ---
         if (!questionText.trim()) { setError('Question text required.'); return; }
 
         // Find valid options (has one, not both)
@@ -159,27 +152,30 @@ export default function EditQuestionPage() {
             imageUrl: (opt.imageUrl && opt.imageUrl.trim()) || null
         })).filter(opt => (opt.text || opt.imageUrl) && !(opt.text && opt.imageUrl));
 
-        if (validOptions.length !== 4) { setError('All 4 options require EITHER text OR an image URL (not both).'); return; }
+        // --- THIS IS THE CHANGE ---
+        // We now check for 4 OR 5 valid options
+        if (validOptions.length !== 4 && validOptions.length !== 5) { 
+            setError('You must provide 4 or 5 options, each with EITHER text OR an image URL (not both).'); 
+            return; 
+        }
+        // --------------------------
 
         if (!correctAnswerValue) { setError('Correct answer required.'); return; }
         
-        // Check if the saved answer value exists in our list of valid options
         const isValidCorrectAnswer = validOptions.some(opt => (opt.text === correctAnswerValue) || (opt.imageUrl === correctAnswerValue));
         if (!isValidCorrectAnswer) { 
             setError('Correct answer must match one of the options. Please re-select it.'); 
-            setCorrectAnswerValue(''); // Clear invalid answer
+            setCorrectAnswerValue('');
             return; 
         }
-        // -----------------------------------
 
         setIsSubmitting(true);
 
-        // Prepare payload with the correct structure
         const payload = {
             grade: level, subject: subject, year: year,
             question: questionText.trim(),
-            options: validOptions, // Already formatted with nulls
-            correctAnswer: correctAnswerValue, // Send the text OR URL
+            options: validOptions, // Send only the valid options
+            correctAnswer: correctAnswerValue, 
             contextImageUrl: contextImageUrl.trim() || null,
             contextText: contextText.trim() || null,
         };
@@ -187,11 +183,9 @@ export default function EditQuestionPage() {
         console.log("Updating question:", payload);
 
         try {
-            // --- Use PUT and include questionId ---
             await axiosInstance.put(`/admin/questions/${questionId}`, payload);
             setSuccessMessage('Question updated successfully!');
             
-            // Redirect back after delay
             setTimeout(() => {
                 router.push(`/admin/questions/${encodeURIComponent(level!)}/${encodeURIComponent(subject!)}/${year}`);
             }, 1500);
@@ -206,7 +200,7 @@ export default function EditQuestionPage() {
 
     return (
         <Layout>
-             {/* Title & Breadcrumbs */}
+             {/* Title & Breadcrumbs (No Change) */}
              <div className="mb-6">
                  <div className="text-sm text-gray-500 dark:text-gray-400 mb-2 space-x-1">
                      <button onClick={() => router.push('/admin/questions')} className="hover:underline">Levels</button> <span>/</span>
@@ -224,7 +218,7 @@ export default function EditQuestionPage() {
                     {error && (<div className="alert-error"><AlertCircle size={18} /> {error}</div>)}
                     {successMessage && (<div className="alert-success"><CheckCircle size={18} /> {successMessage}</div>)}
 
-                    {/* Context Fields */}
+                    {/* Context Fields (No Change) */}
                     <fieldset className="border dark:border-gray-600 rounded-md p-4">
                         <legend className="text-sm font-medium text-gray-600 dark:text-gray-400 px-2">Optional Context</legend>
                         <div className="space-y-4">
@@ -243,20 +237,22 @@ export default function EditQuestionPage() {
                         </div>
                     </fieldset>
 
-                    {/* Question Text */}
+                    {/* Question Text (No Change) */}
                     <div>
                         <label htmlFor="questionText" className="label-style"> Question Text <span className="text-red-500">*</span> </label>
                         <textarea id="questionText" value={questionText} onChange={(e) => setQuestionText(e.target.value)} rows={4} required className="w-full input-style" placeholder="Enter the question..."></textarea>
                     </div>
 
-                    {/* --- UPDATED: Options Inputs --- */}
+                    {/* --- UPDATED: Options Inputs (.map() now renders 5) --- */}
                     <div className="space-y-5">
-                         <label className="label-style block mb-3"> Options (Provide EITHER text OR image URL for each) <span className="text-red-500">*</span> </label>
+                         <label className="label-style block mb-3"> 
+                            Options (Provide EITHER text OR image URL for 4 or 5) 
+                            <span className="text-red-500">*</span> 
+                         </label>
                         {options.map((option, index) => (
                             <div key={index} className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 border dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50">
                                 <span className="font-semibold text-gray-500 dark:text-gray-400">{String.fromCharCode(65 + index)}:</span>
                                 
-                                {/* Text Input Block */}
                                 <div className="flex-1 w-full">
                                     <label htmlFor={`optionText${index}`} className="sr-only">Option {String.fromCharCode(65 + index)} Text</label>
                                     <div className="relative">
@@ -264,7 +260,8 @@ export default function EditQuestionPage() {
                                         <input
                                             id={`optionText${index}`}
                                             type="text"
-                                            value={option.text || ''} // Handle null
+                                            value={option.text || ''} 
+                                            // --- FIXED TYPO: Using e.target.value ---
                                             onChange={(e) => handleOptionChange(index, 'text', e.target.value)}
                                             className="w-full input-style pl-8"
                                             placeholder={`Text for Option ${String.fromCharCode(65 + index)}`}
@@ -273,7 +270,6 @@ export default function EditQuestionPage() {
                                     </div>
                                 </div>
                                 <span className='text-xs text-gray-500 dark:text-gray-400 self-center px-1'>OR</span>
-                                {/* Image URL Input Block */}
                                 <div className="flex-1 w-full">
                                      <label htmlFor={`optionImageUrl${index}`} className="sr-only">Option {String.fromCharCode(65 + index)} Image URL</label>
                                      <div className="relative">
@@ -281,7 +277,7 @@ export default function EditQuestionPage() {
                                         <input
                                             id={`optionImageUrl${index}`}
                                             type="url"
-                                            value={option.imageUrl || ''} // Handle null
+                                            value={option.imageUrl || ''} 
                                             onChange={(e) => handleOptionChange(index, 'imageUrl', e.target.value)}
                                             className="w-full input-style pl-8"
                                             placeholder={`Image URL for Option ${String.fromCharCode(65 + index)}`}
@@ -295,23 +291,19 @@ export default function EditQuestionPage() {
                     </div>
                     {/* ----------------------------- */}
 
-                    {/* --- UPDATED: Correct Answer Selection --- */}
+                    {/* --- Correct Answer Selection (No Change, works for 5) --- */}
                     <div>
                         <label htmlFor="correctAnswer" className="label-style"> Correct Answer <span className="text-red-500">*</span> </label>
                         <select id="correctAnswer" value={correctAnswerValue} onChange={handleCorrectAnswerChange} required className="w-full select-style">
                             <option value="" disabled>-- Select Correct Answer --</option>
                             
-                            {/* Map over ALL options */}
                             {options.map((option, index) => {
-                                // The value is the non-null text OR the non-null image URL
                                 const value = (option.text && option.text.trim()) || (option.imageUrl && option.imageUrl.trim());
-                                // The label is the text, or a placeholder for the image
                                 const label = (option.text && option.text.trim()) 
                                     ? (option.text.substring(0, 70) + (option.text.length > 70 ? "..." : "")) 
                                     : `(Image) ${option.imageUrl ? option.imageUrl.substring(0, 50) + '...' : ''}`;
                                 
-                                // Only render if it's a valid option (has text OR image)
-                                if (!value) return null; 
+                                if (!value) return null; // Don't show empty options in dropdown
 
                                 return (
                                     <option key={index} value={value}>
@@ -324,7 +316,7 @@ export default function EditQuestionPage() {
                     </div>
                     {/* ------------------------------------- */}
 
-                    {/* Submit Button */}
+                    {/* Submit Button (No Change) */}
                     <div className="flex justify-end pt-4">
                         <button type="button" onClick={() => router.back()} disabled={isSubmitting}
                             className="btn-secondary mr-3">
@@ -340,7 +332,7 @@ export default function EditQuestionPage() {
                 </form>
             </div>
             
-             {/* Styles (Using styles from your V2 file) */}
+             {/* Styles (No Change) */}
              <style jsx>{`
                 .label-style { display: block; margin-bottom: 0.5rem; font-weight: 500; color: #374151; } .dark .label-style { color: #D1D5DB; }
                 .input-style { display: block; width: 100%; padding: 0.5rem 0.75rem; border-radius: 0.5rem; border: 1px solid #D1D5DB; background-color: #F9FAFB; transition: all 0.2s; } .dark .input-style { background-color: #374151; border-color: #4B5563; color: #F3F4F6; }
@@ -350,7 +342,7 @@ export default function EditQuestionPage() {
                 .btn-primary { display: inline-flex; align-items: center; padding: 0.625rem 1.25rem; background-color: #2563EB; color: white; font-medium; border-radius: 0.5rem; transition: background-color 0.2s; } .btn-primary:hover:not(:disabled) { background-color: #1D4ED8; } .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
                 .btn-secondary { display: inline-flex; align-items: center; padding: 0.625rem 1.25rem; background-color: #E5E7EB; color: #1F2937; font-medium; border-radius: 0.5rem; transition: background-color 0.2s; } .dark .btn-secondary { background-color: #4B5563; color: #E5E7EB; } .btn-secondary:hover:not(:disabled) { background-color: #D1D5DB; } .dark .btn-secondary:hover:not(:disabled) { background-color: #525f73; } .btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; }
                 .alert-error { padding: 0.75rem; border-radius: 0.5rem; background-color: #FEF2F2; color: #B91C1C; display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; border: 1px solid #F87171; } .dark .alert-error { background-color: rgba(185, 28, 28, 0.2); color: #F87171; border-color: rgba(185, 28, 28, 0.5); }
-                .alert-success { padding: 0.75rem; border-radius: 0.5rem; background-color: #F0FDF4; color: #15803D; display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; border: 1px solid #86EFAC; } .dark .alert-success { background-color: rgba(21, 128, 61, 0.2); color: #86EFAC; border-color: rgba(21, 128, 61, 0.5); }
+                .alert-success { padding: 0.75rem; border-radius: 0.5rem; background-color: #F0FDF4; color: #15803D; display: flex; align-itemss-center; gap: 0.5rem; font-size: 0.875rem; border: 1px solid #86EFAC; } .dark .alert-success { background-color: rgba(21, 128, 61, 0.2); color: #86EFAC; border-color: rgba(21, 128, 61, 0.5); }
                 .loading-placeholder { display: flex; justify-content: center; align-items: center; min-height: 10rem; gap: 0.75rem; color: #6B7280; } .dark .loading-placeholder { color: #9CA3AF; }
                 .access-denied { display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 10rem; gap: 0.75rem; color: #EF4444; } .access-denied svg { height: 2.5rem; width: 2.5rem; }
              `}</style>

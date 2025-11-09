@@ -8,6 +8,11 @@ import axiosInstance from '../../../lib/axios';
 import { ArrowLeft, ArrowRight, CheckCircle, XCircle, Clock, BookOpen, Loader2, AlertTriangle, Home, Image as ImageIcon } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 
+// --- KaTeX Imports ---
+import 'katex/dist/katex.min.css';
+import { InlineMath } from 'react-katex';
+// --------------------
+
 // --- Interfaces ---
 interface OptionData { text: string | null; imageUrl: string | null; }
 interface QuestionData {
@@ -35,6 +40,34 @@ const formatTime = (totalSeconds: number | null): string => {
   const seconds = totalSeconds % 60;
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 };
+
+
+// --- THIS IS THE NEW HELPER FUNCTION ---
+// It finds text wrapped in $...$ and turns it into math.
+const renderMathText = (text: string | undefined | null) => {
+  if (!text) {
+    return null;
+  }
+  // Split the text by the '$' delimiter
+  const parts = text.split('$');
+  
+  return parts.map((part, index) => {
+    // If the index is odd, it's a math expression (between '$')
+    if (index % 2 === 1) {
+      try {
+        // Render the math part
+        return <InlineMath key={index} math={part} />;
+      } catch (e) {
+        // If KaTeX fails, show the broken text
+        return <span key={index} className="text-red-500">{`[Invalid Math: ${part}]`}</span>;
+      }
+    }
+    // If the index is even, it's plain text
+    return <span key={index}>{part}</span>;
+  });
+};
+// -------------------------------------
+
 
 export default function QuizPage() {
   const params = useParams();
@@ -102,6 +135,7 @@ export default function QuizPage() {
   // --- Event Handlers ---
   const handleSelectAnswer = (questionId: string, option: OptionData) => {
       if (isSubmitting || quizResult) return;
+      // We still store the raw text (with $ symbols) as the answer
       const valueToStore = option.text || option.imageUrl;
       if (valueToStore) { setSelectedAnswers(prev => ({ ...prev, [questionId]: valueToStore })); }
       else { console.warn("Clicked an empty option."); }
@@ -163,14 +197,23 @@ export default function QuizPage() {
             <div className="space-y-6">
               {quizResult.reviewData.map((item, index) => (
                 <div key={item.questionId} className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50 border dark:border-gray-600">
-                  <p className="font-semibold text-gray-800 dark:text-gray-200 mb-2"> Q{index + 1}: {item.questionText} </p>
+                  
+                  {/* --- FIX 1 (REVIEW QUESTION) --- */}
+                  <p className="font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                     Q{index + 1}: {renderMathText(item.questionText)}
+                  </p>
+                  
                   <div className={`flex items-start gap-2 text-sm ${ item.isCorrect ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }`}>
                     {item.isCorrect ? <CheckCircle size={16} className="flex-shrink-0 mt-0.5" /> : <XCircle size={16} className="flex-shrink-0 mt-0.5" />}
-                    <div>Your Answer: <span className="font-medium break-all">{item.yourAnswer || '(No answer)'}</span></div>
+                    
+                    {/* --- FIX 2 (REVIEW YOUR ANSWER) --- */}
+                    <div>Your Answer: <span className="font-medium break-all">{renderMathText(item.yourAnswer || '(No answer)')}</span></div>
+                  
                   </div>
                   {!item.isCorrect && (
                     <div className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400 mt-1 ml-6">
-                      <span className="flex-shrink-0">Correct Answer:</span> <span className="font-medium break-all">{item.correctAnswer}</span>
+                      {/* --- FIX 3 (REVIEW CORRECT ANSWER) --- */}
+                      <span className="flex-shrink-0">Correct Answer:</span> <span className="font-medium break-all">{renderMathText(item.correctAnswer)}</span>
                     </div>
                   )}
                 </div>
@@ -195,14 +238,12 @@ export default function QuizPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white p-4 md:p-8">
-      {/* --- FIX: Removed invalid comment --- */}
        <div className="text-center mb-4 md:mb-6">
             <h1 className="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400">{attemptData.subject}</h1>
             <p className="text-lg md:text-xl text-gray-700 dark:text-gray-300">{attemptData.year} - {attemptData.grade}</p>
        </div>
 
       <div className="max-w-3xl mx-auto p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-xl shadow-2xl">
-          {/* --- FIX: Removed invalid comment --- */}
           <div className="flex justify-between items-center mb-4 pb-4 border-b dark:border-gray-600">
              <div className="flex items-center gap-2 text-lg font-semibold text-gray-700 dark:text-gray-300">
                 <BookOpen size={20} />
@@ -214,24 +255,26 @@ export default function QuizPage() {
              </div>
           </div>
       
-          {/* --- FIX: Removed invalid comment --- */}
+          {/* --- FIX 4 (MAIN QUESTION TEXT) --- */}
           <h2 className="text-lg md:text-xl mb-4 font-medium whitespace-pre-wrap">
-             {currentQuestion.questionText}
+             {renderMathText(currentQuestion.questionText)}
           </h2>
           
-          {/* --- FIX: Removed invalid comment --- */}
           {(currentQuestion.contextImageUrl || currentQuestion.contextText) && (
             <div className="mb-4 p-3 border rounded-lg bg-gray-50 dark:bg-gray-700/50 dark:border-gray-600">
               {currentQuestion.contextImageUrl && (
                 <img src={currentQuestion.contextImageUrl} alt="Question Context" className="max-w-full h-auto rounded mx-auto border dark:border-gray-600" />
               )}
               {currentQuestion.contextText && (
-                <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap italic"> {currentQuestion.contextText} </p>
+                // Also apply to context text
+                <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap italic"> 
+                  {renderMathText(currentQuestion.contextText)} 
+                </p>
               )}
             </div>
           )}
 
-          {/* --- Options Mapping (Image size fix is still here) --- */}
+          {/* --- Options Mapping --- */}
           <div className="space-y-3 mt-4">
             {Array.isArray(currentQuestion.options) ? (
                 currentQuestion.options.map((option, index) => {
@@ -246,13 +289,20 @@ export default function QuizPage() {
                     return (
                         <button key={index} onClick={() => handleSelectAnswer(currentQuestionId, option)} disabled={isDisabled || !optionValue} className={buttonClasses} >
                             <span className="font-semibold mt-0.5">{String.fromCharCode(65 + index)}) </span>
-                            {option.text && ( <span className="flex-1">{option.text}</span> )}
+                            
+                            {/* --- FIX 5 (OPTION TEXT) --- */}
+                            {option.text && ( 
+                                <span className="flex-1">
+                                    {renderMathText(option.text)}
+                                </span> 
+                            )}
+                            
                             {option.imageUrl && !option.text && (
                                 <div className="mt-1 mb-1 w-full flex-1 flex justify-center">
                                     <img src={option.imageUrl} alt={`Option ${String.fromCharCode(65 + index)}`}
-                                        className="max-h-20 w-auto rounded border dark:border-gray-600 object-contain" // Keep small image size
+                                        className="max-h-20 w-auto rounded border dark:border-gray-600 object-contain"
                                     />
-                                </div>
+                                 </div>
                             )}
                         </button>
                     );
@@ -261,7 +311,6 @@ export default function QuizPage() {
           </div>
           {/* ----------------------------- */}
 
-          {/* --- FIX: Removed invalid comment --- */}
           <div className="flex justify-between items-center mt-6 md:mt-8 pt-4 border-t dark:border-gray-600">
             <button onClick={handlePrevious} disabled={currentQuestionIndex === 0 || isSubmitting || !!quizResult} className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors disabled:opacity-50" >
               <ArrowLeft size={18} /> Previous

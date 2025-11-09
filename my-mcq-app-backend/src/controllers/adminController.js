@@ -31,8 +31,8 @@ const addQuestion = async (req, res, next) => {
   if (!grade || !subject || !year || !question || !options || !correctAnswer) {
     return res.status(400).json({ message: 'Grade, Subject, Year, Question, Options array, and Correct Answer are required.' });
   }
-  if (!Array.isArray(options) || options.length !== 4) {
-      return res.status(400).json({ message: 'Options must be an array of 4 objects.' });
+  if (!Array.isArray(options) || (options.length !== 4 && options.length !== 5)) {
+      return res.status(400).json({ message: 'Options must be an array of 4 or 5 objects.' });
   }
   
   const invalidOption = options.find(opt => typeof opt !== 'object' || (!opt.text && !opt.imageUrl) || (opt.text && opt.imageUrl));
@@ -129,7 +129,9 @@ const updateQuestion = async (req, res, next) => {
     const questionId = req.params.id;
 
      if (!grade || !subject || !year || !question || !options || !correctAnswer) { return res.status(400).json({ message: 'All fields required.' }); }
-     if (!Array.isArray(options) || options.length !== 4) { return res.status(400).json({ message: 'Options must be an array of 4 objects.' }); }
+     if (!Array.isArray(options) || (options.length !== 4 && options.length !== 5)) { 
+        return res.status(400).json({ message: 'Options must be an array of 4 or 5 objects.' }); 
+     }
      const invalidOption = options.find(opt => typeof opt !== 'object' || (!opt.text && !opt.imageUrl) || (opt.text && opt.imageUrl));
      if (invalidOption) { return res.status(400).json({ message: 'Each option must be an object with EITHER "text" OR "imageUrl", but not both.' }); }
 

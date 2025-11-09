@@ -4,16 +4,14 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "../context/ThemeContext";
-import { AuthProvider } from "../context/AuthContext"; // Import AuthProvider
+import { AuthProvider } from "../context/AuthContext";
 
 const inter = Inter({ subsets: ["latin"] });
 
-// --- UPDATE METADATA ---
 export const metadata: Metadata = {
-  title: "Open MCQ", // Changed title
-  description: "A free, open MCQ evaluation app", // Updated description
+  title: "Open MCQ",
+  description: "A free, open MCQ evaluation app",
 };
-// -----------------------
 
 export default function RootLayout({
   children,
@@ -22,9 +20,21 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        {/* --- THIS IS THE FIX --- 
+          * I have removed the 'integrity' and 'crossOrigin' attributes
+          * to stop the browser from blocking the file.
+        */}
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"
+        />
+        {/* ---------------------- */}
+      </head>
+      
       <body className={inter.className}>
         <ThemeProvider>
-          <AuthProvider> {/* Wrap the content */}
+          <AuthProvider>
             {children}
           </AuthProvider>
         </ThemeProvider>
