@@ -6,38 +6,26 @@ import React, { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import { useAuth } from '../../context/AuthContext';
 import axiosInstance from '../../lib/axios';
-import { FileText, Target, TrendingUp, Trophy, History, Calendar, CheckCircle, Coffee, Sun, Moon, Zap, Loader2, PieChart, BarChart } from 'lucide-react';
+import { 
+  FileText, Target, TrendingUp, Trophy, History, Calendar, 
+  Coffee, Sun, Moon, Zap, Loader2, 
+  Play, Award, ListChecks 
+} from 'lucide-react';
+import { useRouter } from 'next/navigation'; 
 
-// --- Chart.js Imports (Unchanged) ---
-import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
-import { Pie, Bar } from 'react-chartjs-2';
-
-// --- Import useTheme (Unchanged) ---
-import { useTheme } from '../../context/ThemeContext'; //
-
-// --- Register Chart.js components (Unchanged) ---
-ChartJS.register(
-  ArcElement,
-  Tooltip,
-  Legend,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title
-);
-
-// --- UserStats type (Unchanged) ---
+// --- UserStats type ---
 type UserStats = {
   totalAttempts: number;
   highestScore: string;
   averageScore: string;
   rank: string;
   award: string;
+  // We keep these in the type definition to match the API, even if we don't display them
   scoreDistribution: { [key: string]: number };
   subjectAverages: { subject: string; average: number; count: number }[];
 };
 
-// --- AttemptHistoryEntry type (Unchanged) ---
+// --- AttemptHistoryEntry type ---
 interface AttemptHistoryEntry {
   _id: string;
   grade: string;
@@ -50,17 +38,15 @@ interface AttemptHistoryEntry {
 
 export default function DashboardPage() {
   const { user, isLoading: isAuthLoading } = useAuth();
-  
-  // --- THE FIX: Use `isDark` (boolean) instead of `theme` (string) ---
-  const { isDark } = useTheme(); //
+  const router = useRouter(); 
 
-  // State (Unchanged)
+  // State
   const [stats, setStats] = useState<UserStats | null>(null);
   const [recentAttempts, setRecentAttempts] = useState<AttemptHistoryEntry[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // --- getGreeting (Unchanged) ---
+  // --- getGreeting ---
   const getGreeting = () => {
     const currentHour = new Date().getHours();
     const userName = user?.firstName || 'User';
@@ -74,9 +60,8 @@ export default function DashboardPage() {
       return { message: `Good evening, ${userName}!`, quote: "Time for a final review session? 📚", icon: <Zap className="h-6 w-6 text-purple-500" /> };
     }
   };
-  // -------------------------------------
 
-  // --- useEffect (Unchanged) ---
+  // --- useEffect ---
   useEffect(() => {
     if (!isAuthLoading && user) {
         const fetchData = async () => {
@@ -103,7 +88,7 @@ export default function DashboardPage() {
     }
   }, [user, isAuthLoading]);
 
-  // --- formatDate (Unchanged) ---
+  // --- formatDate ---
   const formatDate = (dateString: string) => {
     try {
       return new Date(dateString).toLocaleString(undefined, {
@@ -115,7 +100,7 @@ export default function DashboardPage() {
     }
   };
 
-  // --- Loading/Error UI (Unchanged) ---
+  // --- Loading/Error UI ---
   if (isAuthLoading) {
     return (
         <Layout>
@@ -130,9 +115,7 @@ export default function DashboardPage() {
     return (
         <Layout>
             <div className="p-4 md:p-8">
-                <p className="text-red-500 dark:text-red-400">
-                    User not found. Please log in.
-                </p>
+                <p className="text-red-500 dark:text-red-400">User not found. Please log in.</p>
             </div>
         </Layout>
     );
@@ -140,7 +123,54 @@ export default function DashboardPage() {
 
   const greeting = getGreeting();
 
-  // --- renderStats (Unchanged) ---
+// --- Quick Actions Section ---
+  const renderQuickActions = () => (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      {/* 1. Start Quiz Button (Primary) */}
+      <button 
+        onClick={() => router.push('/papers')}
+        className="w-full flex items-center justify-start gap-4 p-4 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 group"
+      >
+        <div className="shrink-0 p-3 bg-white/20 rounded-full group-hover:rotate-12 transition-transform">
+          <Play size={24} fill="currentColor" />
+        </div>
+        <div className="text-left">
+          <p className="font-bold text-lg leading-tight">Start New Quiz</p>
+          <p className="text-blue-100 text-sm mt-0.5 font-medium">Select a paper</p>
+        </div>
+      </button>
+
+      {/* 2. Leaderboard Button */}
+      <button 
+        onClick={() => router.push('/rankings')}
+        className="w-full flex items-center justify-start gap-4 p-4 rounded-xl bg-white dark:bg-gray-800 border-2 border-transparent hover:border-purple-500 shadow-md hover:shadow-lg transform hover:scale-[1.02] transition-all duration-200 group"
+      >
+         <div className="shrink-0 p-3 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-full">
+          <Award size={24} />
+        </div>
+        <div className="text-left">
+          <p className="font-bold text-gray-900 dark:text-white text-lg leading-tight">Leaderboard</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5 font-medium">See top students</p>
+        </div>
+      </button>
+
+      {/* 3. History Button */}
+      <button 
+        onClick={() => router.push('/history')}
+        className="w-full flex items-center justify-start gap-4 p-4 rounded-xl bg-white dark:bg-gray-800 border-2 border-transparent hover:border-green-500 shadow-md hover:shadow-lg transform hover:scale-[1.02] transition-all duration-200 group"
+      >
+         <div className="shrink-0 p-3 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full">
+          <ListChecks size={24} />
+        </div>
+        <div className="text-left">
+          <p className="font-bold text-gray-900 dark:text-white text-lg leading-tight">My History</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5 font-medium">Review attempts</p>
+        </div>
+      </button>
+    </div>
+  );
+
+  // --- renderStats ---
   const renderStats = () => {
     if (isLoadingData && !stats) {
        return (
@@ -191,7 +221,7 @@ export default function DashboardPage() {
     );
   };
   
-  // --- renderRecentAttempts (Unchanged) ---
+  // --- renderRecentAttempts ---
   const renderRecentAttempts = () => {
       if (isLoadingData && recentAttempts.length === 0) {
         return <p className="p-6 text-gray-500 dark:text-gray-400">Loading recent attempts...</p>;
@@ -232,146 +262,10 @@ export default function DashboardPage() {
       );
   };
 
-  // --- UPDATED: Chart Rendering Components ---
-
-  const renderScoreDistribution = () => {
-    if (isLoadingData) {
-        return <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>;
-    }
-    if (!stats || !stats.scoreDistribution) {
-        return <p className="text-gray-500 text-center p-4">No score data available.</p>;
-    }
-
-    const labels = ['A (90-100%)', 'B (80-89%)', 'C (70-79%)', 'D (60-69%)', 'F (<60%)'];
-    const dataValues = [
-        stats.scoreDistribution['A'],
-        stats.scoreDistribution['B'],
-        stats.scoreDistribution['C'],
-        stats.scoreDistribution['D'],
-        stats.scoreDistribution['F'],
-    ];
-
-    if (dataValues.every(val => val === 0)) {
-         return <p className="text-gray-500 text-center p-4">Complete an attempt to see your score distribution.</p>;
-    }
-    
-    // --- THE FIX: Check `isDark` (boolean) ---
-    const textColor = isDark ? '#fff' : '#374151';
-    const pieBorderColor = isDark ? '#1f2937' : '#ffffff'; // Match card bg (dark:bg-gray-800)
-
-    const data = {
-        labels: labels,
-        datasets: [{
-            label: 'Attempts',
-            data: dataValues,
-            backgroundColor: [
-                'rgba(59, 130, 246, 0.7)', // Blue-500
-                'rgba(34, 197, 94, 0.7)', // Green-500
-                'rgba(234, 179, 8, 0.7)',  // Yellow-500
-                'rgba(249, 115, 22, 0.7)', // Orange-500
-                'rgba(239, 68, 68, 0.7)',  // Red-500
-            ],
-            borderColor: pieBorderColor, // Use dynamic border color
-            borderWidth: 2,
-        }],
-    };
-    
-    return (
-        <div className="relative h-64 md:h-80">
-            <Pie 
-              data={data}
-              options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                      legend: {
-                          position: 'top' as const,
-                          labels: {
-                            color: textColor // Use dynamic text color
-                          }
-                      }
-                  }
-              }}
-              // --- NEW: Add key to force re-render on theme change ---
-              key={isDark ? 'pie-dark' : 'pie-light'}
-            />
-        </div>
-    );
-  };
-  
-  const renderSubjectAverages = () => {
-      if (isLoadingData) {
-          return <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>;
-      }
-      if (!stats || !stats.subjectAverages || stats.subjectAverages.length === 0) {
-          return <p className="text-gray-500 text-center p-4">Complete an attempt to see your subject averages.</p>;
-      }
-
-      const labels = stats.subjectAverages.map(s => s.subject);
-      const dataValues = stats.subjectAverages.map(s => s.average);
-      
-      // --- THE FIX: Check `isDark` (boolean) ---
-      const textColor = isDark ? '#fff' : '#374151';
-      const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
-
-      const data = {
-          labels,
-          datasets: [{
-              label: 'Average Score (%)',
-              data: dataValues,
-              backgroundColor: 'rgba(139, 92, 246, 0.7)', // Purple-500
-              borderColor: 'rgba(139, 92, 246, 1)',
-              borderWidth: 1,
-          }],
-      };
-      
-      return (
-          <div className="relative h-64 md:h-80">
-              <Bar
-                  data={data}
-                  options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      indexAxis: 'y' as const,
-                      scales: {
-                          x: {
-                              beginAtZero: true,
-                              max: 100,
-                              ticks: {
-                                color: textColor // Use dynamic text color
-                              },
-                              grid: {
-                                color: gridColor // Use dynamic grid color
-                              }
-                          },
-                          y: {
-                              ticks: {
-                                color: textColor // Use dynamic text color
-                              },
-                              grid: {
-                                display: false
-                              }
-                          }
-                      },
-                      plugins: {
-                          legend: {
-                              display: false
-                          }
-                      }
-                  }}
-                  // --- NEW: Add key to force re-render on theme change ---
-                  key={isDark ? 'bar-dark' : 'bar-light'}
-              />
-          </div>
-      );
-  };
-  // ---------------------------------
-
-
-  // --- Page Return (Unchanged) ---
+  // --- Page Return ---
   return (
     <Layout>
-      {/* --- Greeting Card --- */}
+      {/* Greeting Card */}
       <div className="mb-6 rounded-lg bg-white dark:bg-gray-800 shadow p-6 flex items-center space-x-4">
         <div className="flex-shrink-0 p-3 bg-blue-100 dark:bg-blue-900/50 rounded-full">
           {greeting.icon}
@@ -385,47 +279,17 @@ export default function DashboardPage() {
           </p>
         </div>
       </div>
-      {/* --- End Greeting Card --- */}
 
+      {/* Render Quick Actions */}
+      {renderQuickActions()}
 
        {/* Display general error */}
        {error && !isLoadingData && <p className="text-center text-red-500 mb-4">{error}</p>}
 
-      {/* --- Render Stats --- */}
+      {/* Render Stats */}
       {renderStats()}
 
-      {/* --- Render Charts --- */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-        
-        {/* Score Distribution Chart */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
-            <div className="p-5 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <PieChart size={20}/> Score Distribution
-                </h2>
-            </div>
-            <div className="p-5">
-                {renderScoreDistribution()}
-            </div>
-        </div>
-        
-        {/* Subject Averages Chart */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
-            <div className="p-5 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <BarChart size={20}/> Average Score by Subject
-                </h2>
-            </div>
-            <div className="p-5">
-                {renderSubjectAverages()}
-            </div>
-        </div>
-
-      </div>
-      {/* --- End Charts --- */}
-
-
-      {/* --- Render Recent Attempts --- */}
+      {/* Render Recent Attempts */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden mt-8">
             <div className="p-5 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -443,7 +307,6 @@ export default function DashboardPage() {
                   </div>
              )}
         </div>
-      {/* --- End Recent Attempts --- */}
 
     </Layout>
   );
